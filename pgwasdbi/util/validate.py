@@ -378,7 +378,7 @@ def validate_configuration(args, filepath):
             with open(filepath) as f:
                 conf = json.load(f)  # data parameters
 
-        # Verify that all necessary values were provided, assuming a complete dataset
+            # Verify that all necessary values were provided, assuming a complete dataset
             expected_fields = ["species_shortname",
                                "species_binomial_name",
                                "species_subspecies",
@@ -399,8 +399,7 @@ def validate_configuration(args, filepath):
                                "missing_SNP_cutoff_value",
                                "missing_line_cutoff_value",
                                "minor_allele_frequency_cutoff_value",
-                               "phenotype_filename",
-                               "lines_filename"
+                               "phenotype_filename"
                                ]
 
         missing_keys = []
@@ -429,8 +428,7 @@ def validate_configuration(args, filepath):
                            "missing_SNP_cutoff_value",
                            "missing_line_cutoff_value",
                            "minor_allele_frequency_cutoff_value",
-                           "phenotype_filename",
-                           "lines_filename"
+                           "phenotype_filename"
                            ]
 
         empty_fields = []
@@ -438,39 +436,70 @@ def validate_configuration(args, filepath):
             if not conf[rf]:
                 empty_fields.append(rf)
         if empty_fields:
-            raise KeyError(
-                f'The following keys must be defined. Empty strings are not permitted. Please modify your JSON configuration: {empty_fields}')
+            raise KeyError(f'The following keys must be defined. Empty strings are not permitted. Please modify your JSON configuration: {empty_fields}')
 
-        logging.info(
-            'Configuration file is valid. Verifying that all files exist.')
+        logging.info('Configuration file is valid. Verifying that all files exist.')
 
         # Track all the files to check for existance
         locations = []
+
+        # Convert all filepaths to absolute paths
+        # Filepath templates
         filepath_template = Template('${cwd}/${filename}')
-
-        # Verify that all files exist
         # Lines
-        lines_filepath = conf['lines_filename']
+        lines_filename = Template('${cwd}/${chr}_${shortname}.012.indv')
         # Genotype
-        genotype_filename = Template('${chr}_${shortname}.012')
+        genotype_filename = Template('${cwd}/${chr}_${shortname}.012')
         # Variants
-        variants_filename = Template('${chr}_${shortname}.012.pos')
+        variants_filename = Template('${cwd}/${chr}_${shortname}.012.pos')
 
+        # Convert filepaths
+        # Convert genotype, variant, and lines
+        conf['genotype_filename'] = []
+        conf['variant_filename'] = []
         for c in range(1, conf['number_of_chromosomes'] + 1):
             chr_shortname = 'chr' + str(c)
             genotype_filepath = genotype_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr=chr_shortname))
+            conf['genotype_filename'].append(genotype_filepath)
             variants_filepath = variants_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr=chr_shortname))
+            conf['variant_filename'].append(variants_filepath)
 
-            if 'line' in args.validate:
-                locations.append(dict(cwd=args.cwd, filetype='line', filename=lines_filepath))
+            # Mark for validation if requested
             if 'genotype' in args.validate:
                 locations.append(dict(cwd=args.cwd, filetype='genotype', filename=genotype_filepath))
             if 'variant' in args.validate:
                 locations.append(dict(cwd=args.cwd, filetype='variant', filename=variants_filepath))
 
+        # Lines
+        if 'lines_filename' not in conf:
+            # Default to the first entry of the genotype files
+            lines_filepath = lines_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr='chr1'))
+        else:
+            lines_filepath = filepath_template.substitute(dict(cwd=args.cwd, filename=conf['lines_filename']))
+            locations.append(lines_filepath)
+        conf['lines_filename'] = lines_filepath
+
+        if 'line' in args.validate:
+            locations.append(dict(cwd=args.cwd, filetype='line', filename=lines_filepath))
+
+
         # Go through all the single files that are not named based off of a chromsome
         # Construct the file descriptor dictionaries, and then loop through and test each file's existance
         # phenotype_filename = Template('${cwd}/${growout}.ph.csv') # Welp, this is another instance of pheno file issue
+
+        if 'phenotype_filename' in conf:
+            # If there is just one phenotype file, convert it to a list of one
+            if not isinstance(conf['phenotype_filename'], list):
+                conf['phenotype_filename'] = [conf['phenotype_filename']]
+            conf['phenotype_filename'] = [filepath_template.substitute(dict(cwd=args.cwd, filetype='phenotype', filename=pfp)) for pfp in conf['phenotype_filename']]
+        if 'population_structure_filename' in conf:
+            conf['population_structure_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='population_structure', filename=conf['population_structure_filename']))
+        if 'gwas_results_filename' in conf:
+            conf['gwas_results_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_results_filename', filename=conf['gwas_results_filename']))
+        if 'gwas_run_filename' in conf:
+            conf['gwas_run_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_run_filename', filename=conf['gwas_run_filename']))
+        if 'kinship_filename' in conf:
+            conf['kinship_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='kinship_filename', filename=conf['kinship_filename']))
         if 'kinship' in args.validate:
             locations.append(dict(cwd=args.cwd, filetype='kinship', filename=conf['kinship_filename']))
         if 'population' in args.validate:
@@ -505,7 +534,6 @@ def validate_configuration(args, filepath):
 
         logging.info(f'Found all files found for validation steps: {args.validate}. Validating file contents.')
 
-        conf['lines_filename'] = filepath_template.substitute(dict(cwd=f'{args.cwd}', filename=conf['lines_filename']))
 
         # Validate the contents of each file
         for file_descriptor in locations:
