@@ -476,7 +476,6 @@ def validate_configuration(args, filepath):
             lines_filepath = lines_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr='chr1'))
         else:
             lines_filepath = filepath_template.substitute(dict(cwd=args.cwd, filename=conf['lines_filename']))
-            locations.append(lines_filepath)
         conf['lines_filename'] = lines_filepath
 
         if 'line' in args.validate:
@@ -516,7 +515,7 @@ def validate_configuration(args, filepath):
             else:
                 # For any of the entries that CAN be a list, add their single values to
                 # the file list
-                if configuration_entry in ['phenotype_filename', 'gwas_run_filename', 'gwas_results_filename']:
+                if configuration_entry in ['phenotype_filename', 'gwas_run_filename', 'gwas_results_filename', 'line']:
                     locations.append(dict(cwd=args.cwd, filetype=configuration_entry, filename=conf[configuration_entry]))
 
         # Remove files that will not be validated
@@ -527,18 +526,17 @@ def validate_configuration(args, filepath):
                 if validation_step in file_location['filetype']:
                     locations.append(file_location)
 
-        for file_descriptor in locations:
-            file_path = filepath_template.substitute(file_descriptor)
-            if not os.path.isfile(file_path):
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
+        for location in locations:
+            if not os.path.isfile(location['filename']):
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), location['filename'])
 
         logging.info(f'Found all files found for validation steps: {args.validate}. Validating file contents.')
-
+        logging.debug(pformat(conf))
 
         # Validate the contents of each file
         for file_descriptor in locations:
             ft = file_descriptor['filetype']
-            fp = filepath_template.substitute(file_descriptor)
+            fp = file_descriptor['filename']
             if ft == 'line' and 'line' in args.validate:
                 validate_line(args, fp)
             elif ft == 'variant' and 'variant' in args.validate:
