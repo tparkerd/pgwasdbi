@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import datetime as dt
 from pathlib import Path
+from pprint import pformat
 
 from pgwasdbi.core import experiment, pipeline
 from pgwasdbi.util.database import connect
@@ -35,7 +36,7 @@ def parse_options():
     # log filepath
     lfp = f"{dt.today().strftime('%Y-%m-%d_%H:%M:%S')}-{os.path.splitext(__loader__.name)[0]}.log"
 
-    logFormatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s %(lineno)d - %(message)s')
+    logFormatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s.%(funcName)s - %(lineno)d - %(message)s')
     rootLogger = logging.getLogger()
     rootLogger.setLevel(logging_level)
 
@@ -78,11 +79,18 @@ def parse_options():
 
 def run(args):
     print("==========================\n\nDo the thing, Zhu Li!\n\n==========================")
-    experiment.design(args)
-    pipeline.design(args)
-    experiment.collect(args)
-    pipeline.collect(args)
-    pipeline.analysis(args)
+    try:
+        experiment.design(args)
+        pipeline.design(args)
+        experiment.collect(args)
+        pipeline.collect(args)
+    except Exception as err:
+        logging.error(f'{type(err).__name__} - {err}'.replace('\n\n', '\t'))
+        raise
+    else:
+        logging.info(f'Importation successful!')
+
+    logging.debug(pformat(args.conf))
 
 if __name__ == '__main__':
     try:
@@ -99,6 +107,8 @@ if __name__ == '__main__':
             try:
                 validate(args)
             except Exception as err:
+                logging.error(f"ARGS: {pformat(args.conf)}")
                 raise err
             else:
-                run(args)
+                if args.dryrun is not True:
+                    run(args)

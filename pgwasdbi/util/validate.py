@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-import sys
 from pprint import pformat
 from string import Template
 
@@ -16,7 +15,7 @@ from pandas_schema.validation import (CanConvertValidation,
                                       IsDistinctValidation)
 from tqdm import tqdm
 
-from pgwasdbi.util.database import connect, config
+from pgwasdbi.util.database import config, connect
 
 
 def file_exists(args, filepath):
@@ -439,6 +438,7 @@ def validate_configuration(args, filepath):
             raise KeyError(f'The following keys must be defined. Empty strings are not permitted. Please modify your JSON configuration: {empty_fields}')
 
         logging.info('Configuration file is valid. Verifying that all files exist.')
+        logging.debug(pformat(conf))
 
         # Track all the files to check for existance
         locations = []
@@ -494,9 +494,13 @@ def validate_configuration(args, filepath):
         if 'population_structure_filename' in conf:
             conf['population_structure_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='population_structure', filename=conf['population_structure_filename']))
         if 'gwas_results_filename' in conf:
-            conf['gwas_results_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_results_filename', filename=conf['gwas_results_filename']))
+            if not isinstance(conf['gwas_results_filename'], list):
+                conf['gwas_results_filename'] = [conf['gwas_results_filename']]
+            conf['gwas_results_filename'] = [filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_results_filename', filename=grfp)) for grfp in conf['gwas_results_filename']]
         if 'gwas_run_filename' in conf:
-            conf['gwas_run_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_run_filename', filename=conf['gwas_run_filename']))
+            if not isinstance(conf['gwas_run_filename'], list):
+                conf['gwas_run_filename'] = [conf['gwas_run_filename']]
+            conf['gwas_run_filename'] = [filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_run_filename', filename=grfp)) for grfp in conf['gwas_run_filename']]
         if 'kinship_filename' in conf:
             conf['kinship_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='kinship_filename', filename=conf['kinship_filename']))
         if 'kinship' in args.validate:
@@ -531,7 +535,99 @@ def validate_configuration(args, filepath):
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), location['filename'])
 
         logging.info(f'Found all files found for validation steps: {args.validate}. Validating file contents.')
-        logging.debug(pformat(conf))
+        configuration = {
+            'chromosome': {
+                'count': conf['number_of_chromosomes']
+            },
+            'lines': {
+                'file': conf['lines_filename']
+            },
+            'kinship': {
+                'file': conf['kinship_filename'],
+                'algorithm': conf['kinship_algortihm_name']
+            },
+            'genotype': {
+                'file': conf['genotype_filename'],
+                'version': {
+                    'annotation_name': conf['genotype_version_annotation_name'],
+                    'assembly_name': conf['genotype_version_assembly_name']
+                }
+            },
+            'population': {
+                'name': conf['population_name'],
+                'structure': {
+                    'file': conf['population_structure_filename'],
+                    'algorithm': conf['population_structure_algorithm_name']
+                },
+                'reference_genome_line': conf['reference_genome_line_name']
+            },
+            'phenotype': {
+                'file': conf['phenotype_filename'],
+            },
+            'variant': {
+                'file': conf['variant_filename']
+            },
+            'species': {
+                'shortname': conf['species_shortname'],
+                'binomial': conf['species_binomial_name'],
+                'subspecies': conf['species_subspecies'],
+                'variety': conf['species_variety']
+            },
+            'gwas': {
+                'algorithm': conf['gwas_algorithm_name'],
+                'file': conf['gwas_results_filename'],
+                'imputation_method': conf['imputation_method_name'],
+                'MAF_cutoff': conf['minor_allele_frequency_cutoff_value'],
+                'SNP_cutoff': conf['missing_SNP_cutoff_value'],
+                'line_cutoff': conf['missing_line_cutoff_value']
+            }
+        }
+
+        args.chromosome = {
+            'count': conf['number_of_chromosomes']
+        }
+        args.lines = {
+            'file': conf['lines_filename']
+        }
+        args.kinship = {
+            'file': conf['kinship_filename'],
+            'algorithm': conf['kinship_algortihm_name']
+        }
+        args.genotype = {
+            'file': conf['genotype_filename'],
+            'version': {
+                'annotation_name': conf['genotype_version_annotation_name'],
+                'assembly_name': conf['genotype_version_assembly_name']
+            }
+        }
+        args.population = {
+            'name': conf['population_name'],
+            'structure': {
+                'file': conf['population_structure_filename'],
+                'algorithm': conf['population_structure_algorithm_name']
+            },
+            'reference_genome_line': conf['reference_genome_line_name']
+        }
+        args.phenotype = {
+            'file': conf['phenotype_filename'],
+        }
+        args.variant = {
+            'file': conf['variant_filename']
+        }
+        args.species = {
+            'shortname': conf['species_shortname'],
+            'binomial': conf['species_binomial_name'],
+            'subspecies': conf['species_subspecies'],
+            'variety': conf['species_variety']
+        }
+        args.gwas = {
+            'algorithm': conf['gwas_algorithm_name'],
+            'file': conf['gwas_results_filename'],
+            'imputation_method': conf['imputation_method_name'],
+            'MAF_cutoff': conf['minor_allele_frequency_cutoff_value'],
+            'SNP_cutoff': conf['missing_SNP_cutoff_value'],
+            'line_cutoff': conf['missing_line_cutoff_value']
+        }
 
         # Validate the contents of each file
         for file_descriptor in locations:
@@ -559,7 +655,7 @@ def validate_configuration(args, filepath):
         raise err
 
     logging.info(f'Input files appear to be valid. Proceeding with import.')
-    args.conf = conf
+    # args.conf = conf
 
 
 def validate(args):
@@ -568,5 +664,7 @@ def validate(args):
     try:
         args.conn = connect(args)
         validate_configuration(args, args.fp)
+        logging.debug(f"Initialized arguments")
+        logging.debug(pformat(args))
     except Exception as err:
         raise err
