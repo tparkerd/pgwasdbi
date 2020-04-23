@@ -48,7 +48,7 @@ def validate_phenotype(args, filepath):
     nrows, ncols = df.shape
     nrows += 1  # include the header in the row count
 
-    acceptable_fields = ['genotype', 'pedigree', 'line', 'taxa']
+    acceptable_fields = ['genotype', 'pedigree', 'line', 'taxa', 'id']
     field_pattern = '|'.join([f"({af})" for af in acceptable_fields])
     if re.match(field_pattern, df.columns[0], re.IGNORECASE) is None:
         raise Exception(f"The name of the first column of a phenotype file should be one of the following values: {acceptable_fields}. Violating file: '{filepath}'")
