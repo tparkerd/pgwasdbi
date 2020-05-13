@@ -37,25 +37,25 @@ def design(args):
     """
 
     # Set shorter variable names for frequently used values
-    conf = args.conf
+    # conf = args.conf
     conn = args.conn
 
     # Expected User Input
     # Species
-    species_shortname = conf['species_shortname']
-    species_binomial = conf['species_binomial_name']
-    species_subspecies = conf['species_subspecies']
-    species_variety = conf['species_variety']
+    species_shortname = args.species['shortname']
+    species_binomial = args.species['binomial']
+    species_subspecies = args.species['subspecies']
+    species_variety = args.species['variety']
     # Population
-    population_name = conf['population_name']
+    population_name = args.population['name']
     # Chromosome
-    chromosome_count = conf['number_of_chromosomes']
+    chromosome_count = args.chromosome['count']
     # Genotype Version
     # NOTE(tparker): This is possibly just the info about the reference genome
     #                It is likely included with the VCF genotype file (.012).
-    genotype_version_assembly_name = conf['genotype_version_assembly_name']
-    genotype_version_annotation_name = conf['genotype_version_annotation_name']
-    reference_genome_line_name = conf['reference_genome_line_name']
+    genotype_version_assembly_name = args.genotype['version']['assembly_name']
+    genotype_version_annotation_name = args.genotype['version']['annotation_name']
+    reference_genome_line_name = args.population['reference_genome_line']
     # Growout, Type, and Location
     # NOTE(tparker): Unknown at this time
     # Location
@@ -64,32 +64,32 @@ def design(args):
     #
     # Traits
     # Allow for more than on phenotype files
-    if isinstance(conf["phenotype_filename"], list):
-        conf['phenotype_filenames'] = [
-            f'{args.cwd}/{filename}' for filename in conf['phenotype_filename']]
+    if isinstance(args.phenotype["file"], list):
+        args.phenotype["file"] = [
+            f'{args.cwd}/{filename}' for filename in args.phenotype["file"]]
     else:
-        conf['phenotype_filenames'] = [f'{args.cwd}/{conf["phenotype_filename"]}']
+        args.phenotype["file"] = [f'{args.cwd}/{args.phenotype["file"]}']
 
     # Model Construction & Insertion
     # Species
     s = species(species_shortname, species_binomial,
                 species_subspecies, species_variety)
     species_id = insert.insert_species(conn, args, s)
-    conf['species_id'] = species_id
+    args.species['id'] = species_id
     logging.debug(f'[Insert]\tSpecies ID\t{species_id}, {s}')
     # Population
     p = population(population_name, species_id)
     population_id = insert.insert_population(conn, args, p)
-    conf['population_id'] = population_id
+    args.population['id'] = population_id
     logging.debug(f'[Insert]\tPopulation ID\t{population_id}: {p}')
     # Chromosome
     chromosome_ids = insert.insert_all_chromosomes_for_species(
         conn, args, chromosome_count, species_id)
-    conf['chromosome_ids'] = chromosome_ids
+    args.chromosome['ids'] = chromosome_ids
     logging.debug(f'[Insert]\tChromosome IDs\t{chromosome_ids}')
     # Line
     # working_filepath = lines_filename.substitute(dict(chr="chr1", cwd=f"{args.cwd}", shortname=species_shortname))
-    working_filepath = conf["lines_filename"]
+    working_filepath = args.lines['file']
     try:
         if not os.path.isfile(working_filepath):
             raise FileNotFoundError(errno.ENOENT, os.strerror(
@@ -112,7 +112,7 @@ def design(args):
                           reference_genome=reference_genome_id,
                           genotype_version_population=population_id)
     genotype_version_id = insert.insert_genotype_version(conn, args, gv)
-    conf['genotype_version_id'] = genotype_version_id
+    args.genotype['version']['id'] = genotype_version_id
     logging.debug(f'[Insert]\tGenome Version ID\t{genotype_version_id}')
     if genotype_version_id is None:
         raise Exception(f'Genotype version is None for parameters: {pformat(gv)}')
@@ -126,7 +126,7 @@ def design(args):
     # Traits
     # Go through all the phenotype files available for the dataset and insert
     # the recorded traits for each.
-    for phenotype_filepath in conf['phenotype_filenames']:
+    for phenotype_filepath in args.phenotype['files']:
         try:
             if not os.path.isfile(phenotype_filepath):
                 raise FileNotFoundError(errno.ENOENT, os.strerror(

@@ -34,7 +34,7 @@ def parse_options():
         logging_level = logging.DEBUG
 
     # log filepath
-    lfp = f"{dt.today().strftime('%Y-%m-%d_%H:%M:%S')}-{os.path.splitext(__loader__.name)[0]}.log"
+    lfp = f"{dt.today().strftime('%Y-%m-%d')}-{os.path.splitext(__loader__.name)[0]}.log"
 
     logFormatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s.%(funcName)s - %(lineno)d - %(message)s')
     rootLogger = logging.getLogger()
@@ -79,6 +79,7 @@ def parse_options():
 
 def run(args):
     print("==========================\n\nDo the thing, Zhu Li!\n\n==========================")
+    logging.debug(pformat(args))
     try:
         experiment.design(args)
         pipeline.design(args)
@@ -89,8 +90,6 @@ def run(args):
         raise
     else:
         logging.info(f'Importation successful!')
-
-    logging.debug(pformat(args.conf))
 
 if __name__ == '__main__':
     try:
