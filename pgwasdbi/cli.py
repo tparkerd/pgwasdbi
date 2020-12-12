@@ -41,7 +41,9 @@ def main():
         nargs="+",
         help="Validate input files. Available options: ['all', 'config', 'line', 'genotype', 'variant', 'kinship', 'population', 'phenotype', 'runs', 'result']",
     )
-    default_environment = f"/home/tparker/Projects/danforth/baxter/pgwasdbi/.env.qa"  # look in the installation/containing folder for the package
+    default_environment = (
+        f".env.qa"  # look in the installation/containing folder for the package
+    )
     parser.add_argument(
         "--env",
         nargs="?",
