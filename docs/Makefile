@@ -3,8 +3,8 @@
 
 # You can set these variables from the command line.
 SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
-SPHINXPROJ    = BurntRosemary
+SPHINXBUILD   = python -msphinx
+SPHINXPROJ    = pgwasdbi
 SOURCEDIR     = .
 BUILDDIR      = _build
 

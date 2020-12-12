@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-import sys
 from pprint import pformat
 from string import Template
 
@@ -16,7 +15,7 @@ from pandas_schema.validation import (CanConvertValidation,
                                       IsDistinctValidation)
 from tqdm import tqdm
 
-from pgwasdbi.util.database import connect, config
+from pgwasdbi.util.database import config, connect
 
 
 def file_exists(args, filepath):
@@ -49,7 +48,7 @@ def validate_phenotype(args, filepath):
     nrows, ncols = df.shape
     nrows += 1  # include the header in the row count
 
-    acceptable_fields = ['genotype', 'pedigree', 'line', 'taxa']
+    acceptable_fields = ['genotype', 'pedigree', 'line', 'taxa', 'id']
     field_pattern = '|'.join([f"({af})" for af in acceptable_fields])
     if re.match(field_pattern, df.columns[0], re.IGNORECASE) is None:
         raise Exception(f"The name of the first column of a phenotype file should be one of the following values: {acceptable_fields}. Violating file: '{filepath}'")
@@ -378,7 +377,7 @@ def validate_configuration(args, filepath):
             with open(filepath) as f:
                 conf = json.load(f)  # data parameters
 
-        # Verify that all necessary values were provided, assuming a complete dataset
+            # Verify that all necessary values were provided, assuming a complete dataset
             expected_fields = ["species_shortname",
                                "species_binomial_name",
                                "species_subspecies",
@@ -399,8 +398,7 @@ def validate_configuration(args, filepath):
                                "missing_SNP_cutoff_value",
                                "missing_line_cutoff_value",
                                "minor_allele_frequency_cutoff_value",
-                               "phenotype_filename",
-                               "lines_filename"
+                               "phenotype_filename"
                                ]
 
         missing_keys = []
@@ -429,8 +427,7 @@ def validate_configuration(args, filepath):
                            "missing_SNP_cutoff_value",
                            "missing_line_cutoff_value",
                            "minor_allele_frequency_cutoff_value",
-                           "phenotype_filename",
-                           "lines_filename"
+                           "phenotype_filename"
                            ]
 
         empty_fields = []
@@ -438,39 +435,74 @@ def validate_configuration(args, filepath):
             if not conf[rf]:
                 empty_fields.append(rf)
         if empty_fields:
-            raise KeyError(
-                f'The following keys must be defined. Empty strings are not permitted. Please modify your JSON configuration: {empty_fields}')
+            raise KeyError(f'The following keys must be defined. Empty strings are not permitted. Please modify your JSON configuration: {empty_fields}')
 
-        logging.info(
-            'Configuration file is valid. Verifying that all files exist.')
+        logging.info('Configuration file is valid. Verifying that all files exist.')
+        logging.debug(pformat(conf))
 
         # Track all the files to check for existance
         locations = []
+
+        # Convert all filepaths to absolute paths
+        # Filepath templates
         filepath_template = Template('${cwd}/${filename}')
-
-        # Verify that all files exist
         # Lines
-        lines_filepath = conf['lines_filename']
+        lines_filename = Template('${cwd}/${chr}_${shortname}.012.indv')
         # Genotype
-        genotype_filename = Template('${chr}_${shortname}.012')
+        genotype_filename = Template('${cwd}/${chr}_${shortname}.012')
         # Variants
-        variants_filename = Template('${chr}_${shortname}.012.pos')
+        variants_filename = Template('${cwd}/${chr}_${shortname}.012.pos')
 
+        # Convert filepaths
+        # Convert genotype, variant, and lines
+        conf['genotype_filename'] = []
+        conf['variant_filename'] = []
         for c in range(1, conf['number_of_chromosomes'] + 1):
             chr_shortname = 'chr' + str(c)
             genotype_filepath = genotype_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr=chr_shortname))
+            conf['genotype_filename'].append(genotype_filepath)
             variants_filepath = variants_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr=chr_shortname))
+            conf['variant_filename'].append(variants_filepath)
 
-            if 'line' in args.validate:
-                locations.append(dict(cwd=args.cwd, filetype='line', filename=lines_filepath))
+            # Mark for validation if requested
             if 'genotype' in args.validate:
                 locations.append(dict(cwd=args.cwd, filetype='genotype', filename=genotype_filepath))
             if 'variant' in args.validate:
                 locations.append(dict(cwd=args.cwd, filetype='variant', filename=variants_filepath))
 
+        # Lines
+        if 'lines_filename' not in conf:
+            # Default to the first entry of the genotype files
+            lines_filepath = lines_filename.substitute(dict(cwd=args.cwd, shortname=conf['species_shortname'], chr='chr1'))
+        else:
+            lines_filepath = filepath_template.substitute(dict(cwd=args.cwd, filename=conf['lines_filename']))
+        conf['lines_filename'] = lines_filepath
+
+        if 'line' in args.validate:
+            locations.append(dict(cwd=args.cwd, filetype='line', filename=lines_filepath))
+
+
         # Go through all the single files that are not named based off of a chromsome
         # Construct the file descriptor dictionaries, and then loop through and test each file's existance
         # phenotype_filename = Template('${cwd}/${growout}.ph.csv') # Welp, this is another instance of pheno file issue
+
+        if 'phenotype_filename' in conf:
+            # If there is just one phenotype file, convert it to a list of one
+            if not isinstance(conf['phenotype_filename'], list):
+                conf['phenotype_filename'] = [conf['phenotype_filename']]
+            conf['phenotype_filename'] = [filepath_template.substitute(dict(cwd=args.cwd, filetype='phenotype', filename=pfp)) for pfp in conf['phenotype_filename']]
+        if 'population_structure_filename' in conf:
+            conf['population_structure_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='population_structure', filename=conf['population_structure_filename']))
+        if 'gwas_results_filename' in conf:
+            if not isinstance(conf['gwas_results_filename'], list):
+                conf['gwas_results_filename'] = [conf['gwas_results_filename']]
+            conf['gwas_results_filename'] = [filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_results_filename', filename=grfp)) for grfp in conf['gwas_results_filename']]
+        if 'gwas_run_filename' in conf:
+            if not isinstance(conf['gwas_run_filename'], list):
+                conf['gwas_run_filename'] = [conf['gwas_run_filename']]
+            conf['gwas_run_filename'] = [filepath_template.substitute(dict(cwd=args.cwd, filetype='gwas_run_filename', filename=grfp)) for grfp in conf['gwas_run_filename']]
+        # if 'kinship_filename' in conf:
+        #     conf['kinship_filename'] = filepath_template.substitute(dict(cwd=args.cwd, filetype='kinship_filename', filename=conf['kinship_filename']))
         if 'kinship' in args.validate:
             locations.append(dict(cwd=args.cwd, filetype='kinship', filename=conf['kinship_filename']))
         if 'population' in args.validate:
@@ -487,7 +519,7 @@ def validate_configuration(args, filepath):
             else:
                 # For any of the entries that CAN be a list, add their single values to
                 # the file list
-                if configuration_entry in ['phenotype_filename', 'gwas_run_filename', 'gwas_results_filename']:
+                if configuration_entry in ['phenotype_filename', 'gwas_run_filename', 'gwas_results_filename', 'line']:
                     locations.append(dict(cwd=args.cwd, filetype=configuration_entry, filename=conf[configuration_entry]))
 
         # Remove files that will not be validated
@@ -498,19 +530,109 @@ def validate_configuration(args, filepath):
                 if validation_step in file_location['filetype']:
                     locations.append(file_location)
 
-        for file_descriptor in locations:
-            file_path = filepath_template.substitute(file_descriptor)
-            if not os.path.isfile(file_path):
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
+        for location in locations:
+            if not os.path.isfile(location['filename']):
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), location['filename'])
 
         logging.info(f'Found all files found for validation steps: {args.validate}. Validating file contents.')
+        configuration = {
+            'chromosome': {
+                'count': conf['number_of_chromosomes']
+            },
+            'lines': {
+                'file': conf['lines_filename']
+            },
+            'kinship': {
+                'file': conf['kinship_filename'],
+                'algorithm': conf['kinship_algortihm_name']
+            },
+            'genotype': {
+                'file': conf['genotype_filename'],
+                'version': {
+                    'annotation_name': conf['genotype_version_annotation_name'],
+                    'assembly_name': conf['genotype_version_assembly_name']
+                }
+            },
+            'population': {
+                'name': conf['population_name'],
+                'structure': {
+                    'file': conf['population_structure_filename'],
+                    'algorithm': conf['population_structure_algorithm_name']
+                },
+                'reference_genome_line': conf['reference_genome_line_name']
+            },
+            'phenotype': {
+                'file': conf['phenotype_filename'],
+            },
+            'variant': {
+                'file': conf['variant_filename']
+            },
+            'species': {
+                'shortname': conf['species_shortname'],
+                'binomial': conf['species_binomial_name'],
+                'subspecies': conf['species_subspecies'],
+                'variety': conf['species_variety']
+            },
+            'gwas': {
+                'algorithm': conf['gwas_algorithm_name'],
+                'file': conf['gwas_results_filename'],
+                'imputation_method': conf['imputation_method_name'],
+                'MAF_cutoff': conf['minor_allele_frequency_cutoff_value'],
+                'SNP_cutoff': conf['missing_SNP_cutoff_value'],
+                'line_cutoff': conf['missing_line_cutoff_value']
+            }
+        }
 
-        conf['lines_filename'] = filepath_template.substitute(dict(cwd=f'{args.cwd}', filename=conf['lines_filename']))
+        args.chromosome = {
+            'count': conf['number_of_chromosomes']
+        }
+        args.lines = {
+            'file': conf['lines_filename']
+        }
+        args.kinship = {
+            'file': conf['kinship_filename'],
+            'algorithm': conf['kinship_algortihm_name']
+        }
+        args.genotype = {
+            'file': conf['genotype_filename'],
+            'version': {
+                'annotation_name': conf['genotype_version_annotation_name'],
+                'assembly_name': conf['genotype_version_assembly_name']
+            }
+        }
+        args.population = {
+            'name': conf['population_name'],
+            'structure': {
+                'file': conf['population_structure_filename'],
+                'algorithm': conf['population_structure_algorithm_name']
+            },
+            'reference_genome_line': conf['reference_genome_line_name']
+        }
+        args.phenotype = {
+            'file': conf['phenotype_filename'],
+        }
+        args.variant = {
+            'file': conf['variant_filename']
+        }
+        args.species = {
+            'shortname': conf['species_shortname'],
+            'binomial': conf['species_binomial_name'],
+            'subspecies': conf['species_subspecies'],
+            'variety': conf['species_variety']
+        }
+        args.gwas = {
+            'algorithm': conf['gwas_algorithm_name'],
+            'file': conf['gwas_results_filename'],
+            'imputation_method': conf['imputation_method_name'],
+            'MAF_cutoff': conf['minor_allele_frequency_cutoff_value'],
+            'SNP_cutoff': conf['missing_SNP_cutoff_value'],
+            'line_cutoff': conf['missing_line_cutoff_value']
+        }
 
         # Validate the contents of each file
         for file_descriptor in locations:
             ft = file_descriptor['filetype']
-            fp = filepath_template.substitute(file_descriptor)
+            fp = file_descriptor['filename']
             if ft == 'line' and 'line' in args.validate:
                 validate_line(args, fp)
             elif ft == 'variant' and 'variant' in args.validate:
@@ -542,5 +664,7 @@ def validate(args):
     try:
         args.conn = connect(args)
         validate_configuration(args, args.fp)
+        logging.debug(f"Initialized arguments")
+        logging.debug(pformat(args))
     except Exception as err:
         raise err

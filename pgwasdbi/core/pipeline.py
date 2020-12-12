@@ -1,14 +1,29 @@
 import errno
 import os
 
-from importation.util import find, insert
-from pgwasdbi.util.models import (chromosome, genotype, genotype_version,
-                                  growout, growout_type, gwas_algorithm,
-                                  gwas_result, gwas_run, imputation_method,
-                                  kinship, kinship_algorithm, line, location,
-                                  phenotype, population, population_structure,
-                                  population_structure_algorithm, species,
-                                  trait, variant)
+from pgwasdbi.util import find, insert
+from pgwasdbi.util.models import (
+    chromosome,
+    genotype,
+    genotype_version,
+    growout,
+    growout_type,
+    gwas_algorithm,
+    gwas_result,
+    gwas_run,
+    imputation_method,
+    kinship,
+    kinship_algorithm,
+    line,
+    location,
+    phenotype,
+    population,
+    population_structure,
+    population_structure_algorithm,
+    species,
+    trait,
+    variant,
+)
 
 
 def design(args):
@@ -27,31 +42,32 @@ def design(args):
     # Expected User Input
     # GWAS Algorithm
     # According to Greg's README
-    gwas_algorithm_name = conf['gwas_algorithm_name']
+    gwas_algorithm_name = conf["gwas_algorithm_name"]
     # Imputation Method
     # Unknown, apparently it was done by someone named Sujan
-    imputation_method_name = conf['imputation_method_name']
+    imputation_method_name = conf["imputation_method_name"]
     # Kinship Algorithm
     # Placeholder, I don't know the exact string that should be used
-    kinship_algorithm_name = conf['kinship_algortihm_name']
+    kinship_algorithm_name = conf["kinship_algortihm_name"]
     # Population Structure Algorithm
     # This is a guess based on filename
-    population_structure_algorithm_name = conf['population_structure_algorithm_name']
+    population_structure_algorithm_name = conf["population_structure_algorithm_name"]
 
     # Model Construction & Insertion
     # GWAS Algorithm
     ga = gwas_algorithm(gwas_algorithm_name)
-    conf['gwas_algorithm_id'] = insert.insert_gwas_algorithm(conn, args, ga)
+    conf["gwas_algorithm_id"] = insert.insert_gwas_algorithm(conn, args, ga)
     # Imputation Method
     im = imputation_method(imputation_method_name)
-    conf['imputation_method_id'] = insert.insert_imputation_method(conn, args, im)
+    conf["imputation_method_id"] = insert.insert_imputation_method(conn, args, im)
     # Kinship Algorithm
     ka = kinship_algorithm(kinship_algorithm_name)
-    conf['kinship_algorithm_id'] = insert.insert_kinship_algorithm(conn, args, ka)
+    conf["kinship_algorithm_id"] = insert.insert_kinship_algorithm(conn, args, ka)
     # Population Structure Algorithm
     psa = population_structure_algorithm(population_structure_algorithm_name)
-    conf['population_structure_algorithm_id'] = insert.insert_population_structure_algorithm(
-        conn, args, psa)
+    conf[
+        "population_structure_algorithm_id"
+    ] = insert.insert_population_structure_algorithm(conn, args, psa)
 
 
 def collect(args):
@@ -82,30 +98,31 @@ def collect(args):
     # Population Structure
     # NOTE(tparker): Same reasoning as the kinship file. There should be a way
     #                for the data to be stored in the database, not a
-    population_structure_filepath = f'{args.cwd}/{conf["population_structure_filename"]}'
+    population_structure_filepath = conf["population_structure_filename"]
 
-    kinship_algorithm_id = conf['kinship_algorithm_id']
-    population_structure_algorithm_id = conf['population_structure_algorithm_id']
+    kinship_algorithm_id = conf["kinship_algorithm_id"]
+    population_structure_algorithm_id = conf["population_structure_algorithm_id"]
 
     # Model Construction & Insertion
     # Kinship
     try:
         if not os.path.isfile(kinship_filepath):
-            raise FileNotFoundError(errno.ENOENT, os.strerror(
-                errno.ENOENT), kinship_filepath)
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), kinship_filepath
+            )
         if not os.path.isfile(population_structure_filepath):
-            raise FileNotFoundError(errno.ENOENT, os.strerror(
-                errno.ENOENT), population_structure_filepath)
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), population_structure_filepath
+            )
     except:
         raise
     k = kinship(kinship_algorithm_id, kinship_filepath)
     kinship_id = insert.insert_kinship(conn, args, k)
     # Population Structure
     ps = population_structure(
-        population_structure_algorithm_id, population_structure_filepath)
-    population_structure_id = insert.insert_population_structure(
-        conn, args, ps)
-
+        population_structure_algorithm_id, population_structure_filepath
+    )
+    population_structure_id = insert.insert_population_structure(conn, args, ps)
 
 
 def analysis(args):

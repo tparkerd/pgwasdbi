@@ -62,13 +62,13 @@ def design(args):
     # Type
     # Growout
     #
-    # Traits
-    # Allow for more than on phenotype files
-    if isinstance(conf["phenotype_filename"], list):
-        conf['phenotype_filenames'] = [
-            f'{args.cwd}/{filename}' for filename in conf['phenotype_filename']]
-    else:
-        conf['phenotype_filenames'] = [f'{args.cwd}/{conf["phenotype_filename"]}']
+    # # Traits
+    # # Allow for more than on phenotype files
+    # if isinstance(conf["phenotype_filename"], list):
+    #     conf['phenotype_filenames'] = [
+    #         f'{args.cwd}/{filename}' for filename in conf['phenotype_filename']]
+    # else:
+    #     conf['phenotype_filenames'] = [f'{args.cwd}/{conf["phenotype_filename"]}']
 
     # Model Construction & Insertion
     # Species
@@ -126,11 +126,10 @@ def design(args):
     # Traits
     # Go through all the phenotype files available for the dataset and insert
     # the recorded traits for each.
-    for phenotype_filepath in conf['phenotype_filenames']:
+    for phenotype_filepath in conf['phenotype_filename']:
         try:
             if not os.path.isfile(phenotype_filepath):
-                raise FileNotFoundError(errno.ENOENT, os.strerror(
-                    errno.ENOENT), phenotype_filepath)
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), phenotype_filepath)
         except:
             raise
         traits = list(pd.read_csv(phenotype_filepath, index_col=0))
@@ -170,7 +169,7 @@ def collect(args):
 
     # Model Construction & Insertion
     # Phenotype
-    for phenotype_filepath in conf['phenotype_filenames']:
+    for phenotype_filepath in conf['phenotype_filename']:
         if not os.path.isfile(phenotype_filepath):
             raise FileNotFoundError(errno.ENOENT, os.strerror(
                 errno.ENOENT), phenotype_filepath)
