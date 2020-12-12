@@ -7,13 +7,28 @@ from string import Template
 import pandas as pd
 
 from pgwasdbi.util import find, insert
-from pgwasdbi.util.models import (chromosome, genotype, genotype_version,
-                                  growout, growout_type, gwas_algorithm,
-                                  gwas_result, gwas_run, imputation_method,
-                                  kinship, kinship_algorithm, line, location,
-                                  phenotype, population, population_structure,
-                                  population_structure_algorithm, species,
-                                  trait, variant)
+from pgwasdbi.util.models import (
+    chromosome,
+    genotype,
+    genotype_version,
+    growout,
+    growout_type,
+    gwas_algorithm,
+    gwas_result,
+    gwas_run,
+    imputation_method,
+    kinship,
+    kinship_algorithm,
+    line,
+    location,
+    phenotype,
+    population,
+    population_structure,
+    population_structure_algorithm,
+    species,
+    trait,
+    variant,
+)
 
 
 def design(args):
@@ -33,89 +48,101 @@ def design(args):
             Type: "field", "phenotyper", etc.
             Growout: name, population ID, location ID, year, type
                     "PU09", maize282popID, PUlocID, 2009, fieldGrowoutTypeID
-    Traits (planned phenotypes/traits to measure)    
+    Traits (planned phenotypes/traits to measure)
     """
 
     # Set shorter variable names for frequently used values
-    conf = args.conf
+    # conf = args.conf
     conn = args.conn
 
     # Expected User Input
     # Species
-    species_shortname = conf['species_shortname']
-    species_binomial = conf['species_binomial_name']
-    species_subspecies = conf['species_subspecies']
-    species_variety = conf['species_variety']
+    species_shortname = args.species["shortname"]
+    species_binomial = args.species["binomial"]
+    species_subspecies = args.species["subspecies"]
+    species_variety = args.species["variety"]
     # Population
-    population_name = conf['population_name']
+    population_name = args.population["name"]
     # Chromosome
-    chromosome_count = conf['number_of_chromosomes']
+    chromosome_count = args.chromosome["count"]
     # Genotype Version
     # NOTE(tparker): This is possibly just the info about the reference genome
     #                It is likely included with the VCF genotype file (.012).
-    genotype_version_assembly_name = conf['genotype_version_assembly_name']
-    genotype_version_annotation_name = conf['genotype_version_annotation_name']
-    reference_genome_line_name = conf['reference_genome_line_name']
+    genotype_version_assembly_name = args.genotype["version"]["assembly_name"]
+    genotype_version_annotation_name = args.genotype["version"]["annotation_name"]
+    reference_genome_line_name = args.population["reference_genome_line"]
     # Growout, Type, and Location
     # NOTE(tparker): Unknown at this time
     # Location
     # Type
     # Growout
     #
-    # # Traits
-    # # Allow for more than on phenotype files
-    # if isinstance(conf["phenotype_filename"], list):
-    #     conf['phenotype_filenames'] = [
-    #         f'{args.cwd}/{filename}' for filename in conf['phenotype_filename']]
-    # else:
-    #     conf['phenotype_filenames'] = [f'{args.cwd}/{conf["phenotype_filename"]}']
+    # Traits
+    # Allow for more than on phenotype files
+    if isinstance(args.phenotype["file"], list):
+        args.phenotype["file"] = [
+            f"{args.cwd}/{filename}" for filename in args.phenotype["file"]
+        ]
+    else:
+        args.phenotype["file"] = [f'{args.cwd}/{args.phenotype["file"]}']
 
     # Model Construction & Insertion
     # Species
-    s = species(species_shortname, species_binomial,
-                species_subspecies, species_variety)
+    s = species(
+        species_shortname, species_binomial, species_subspecies, species_variety
+    )
     species_id = insert.insert_species(conn, args, s)
-    conf['species_id'] = species_id
-    logging.debug(f'[Insert]\tSpecies ID\t{species_id}, {s}')
+    args.species["id"] = species_id
+    logging.debug(f"[Insert]\tSpecies ID\t{species_id}, {s}")
     # Population
     p = population(population_name, species_id)
     population_id = insert.insert_population(conn, args, p)
-    conf['population_id'] = population_id
-    logging.debug(f'[Insert]\tPopulation ID\t{population_id}: {p}')
+    args.population["id"] = population_id
+    logging.debug(f"[Insert]\tPopulation ID\t{population_id}: {p}")
     # Chromosome
     chromosome_ids = insert.insert_all_chromosomes_for_species(
-        conn, args, chromosome_count, species_id)
-    conf['chromosome_ids'] = chromosome_ids
-    logging.debug(f'[Insert]\tChromosome IDs\t{chromosome_ids}')
+        conn, args, chromosome_count, species_id
+    )
+    args.chromosome["ids"] = chromosome_ids
+    logging.debug(f"[Insert]\tChromosome IDs\t{chromosome_ids}")
     # Line
     # working_filepath = lines_filename.substitute(dict(chr="chr1", cwd=f"{args.cwd}", shortname=species_shortname))
-    working_filepath = conf["lines_filename"]
+    working_filepath = args.lines["file"]
     try:
         if not os.path.isfile(working_filepath):
-            raise FileNotFoundError(errno.ENOENT, os.strerror(
-                errno.ENOENT), working_filepath)
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), working_filepath
+            )
     except:
         raise
 
     # hard-coded substitue until just one file is used for lines
     line_ids = insert.insert_lines_from_file(
-        conn, args, working_filepath, population_id)
-    logging.debug(f'[Insert]\tLine IDs\t{line_ids}')
+        conn, args, working_filepath, population_id
+    )
+    logging.debug(f"[Insert]\tLine IDs\t{line_ids}")
     # Genotype Version
-    reference_genome_id = find.find_line(conn, args, reference_genome_line_name, population_id)
+    reference_genome_id = find.find_line(
+        conn, args, reference_genome_line_name, population_id
+    )
     if reference_genome_id is None:
-        raise Exception(f"Reference genome '{reference_genome_line_name}' must exist in the given population.")
+        raise Exception(
+            f"Reference genome '{reference_genome_line_name}' must exist in the given population."
+        )
     logging.debug(
-        f'[Insert]\tReference Genome ID\t{reference_genome_id}, ({reference_genome_line_name}, {population_id})')
-    gv = genotype_version(genotype_version_name=genotype_version_assembly_name,
-                          genotype_version=genotype_version_annotation_name,
-                          reference_genome=reference_genome_id,
-                          genotype_version_population=population_id)
+        f"[Insert]\tReference Genome ID\t{reference_genome_id}, ({reference_genome_line_name}, {population_id})"
+    )
+    gv = genotype_version(
+        genotype_version_name=genotype_version_assembly_name,
+        genotype_version=genotype_version_annotation_name,
+        reference_genome=reference_genome_id,
+        genotype_version_population=population_id,
+    )
     genotype_version_id = insert.insert_genotype_version(conn, args, gv)
-    conf['genotype_version_id'] = genotype_version_id
-    logging.debug(f'[Insert]\tGenome Version ID\t{genotype_version_id}')
+    args.genotype["version"]["id"] = genotype_version_id
+    logging.debug(f"[Insert]\tGenome Version ID\t{genotype_version_id}")
     if genotype_version_id is None:
-        raise Exception(f'Genotype version is None for parameters: {pformat(gv)}')
+        raise Exception(f"Genotype version is None for parameters: {pformat(gv)}")
 
     # Growout, Type, and Location
     # NOTE(tparker): Unknown at this time
@@ -126,17 +153,19 @@ def design(args):
     # Traits
     # Go through all the phenotype files available for the dataset and insert
     # the recorded traits for each.
-    for phenotype_filepath in conf['phenotype_filename']:
+    for phenotype_filepath in args.phenotype["files"]:
         try:
             if not os.path.isfile(phenotype_filepath):
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), phenotype_filepath)
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), phenotype_filepath
+                )
         except:
             raise
         traits = list(pd.read_csv(phenotype_filepath, index_col=0))
         trait_ids = insert.insert_traits_from_traitlist(
-            conn, args, traits, phenotype_filepath)
-        logging.debug(
-            f'[Insert]\tTrait IDs for {phenotype_filepath}\t{trait_ids}')
+            conn, args, traits, phenotype_filepath
+        )
+        logging.debug(f"[Insert]\tTrait IDs for {phenotype_filepath}\t{trait_ids}")
 
 
 def collect(args):
@@ -158,61 +187,85 @@ def collect(args):
     # Phenotype
     # NOTE(tparker): Define in earlier stage
     # Genotype
-    genotype_filename = Template('${cwd}/${chr}_${shortname}.012')
+    genotype_filename = Template("${cwd}/${chr}_${shortname}.012")
     # Variants
-    variants_filename = Template('${cwd}/${chr}_${shortname}.012.pos')
+    variants_filename = Template("${cwd}/${chr}_${shortname}.012.pos")
 
-    chromosome_count = conf['number_of_chromosomes']
-    species_id = conf['species_id']
-    species_shortname = conf['species_shortname']
-    genotype_version_id = conf['genotype_version_id']
+    chromosome_count = conf["number_of_chromosomes"]
+    species_id = conf["species_id"]
+    species_shortname = conf["species_shortname"]
+    genotype_version_id = conf["genotype_version_id"]
 
     # Model Construction & Insertion
     # Phenotype
-    for phenotype_filepath in conf['phenotype_filename']:
+    for phenotype_filepath in conf["phenotype_filename"]:
         if not os.path.isfile(phenotype_filepath):
-            raise FileNotFoundError(errno.ENOENT, os.strerror(
-                errno.ENOENT), phenotype_filepath)
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), phenotype_filepath
+            )
 
-        population_id = conf['population_id']
+        population_id = conf["population_id"]
         phenotype_ids = insert.insert_phenotypes_from_file(
-            conn, args, phenotype_filepath, population_id, phenotype_filepath)
+            conn, args, phenotype_filepath, population_id, phenotype_filepath
+        )
         logging.debug(
-            f'[Insert]\tPhenotype IDs for {phenotype_filepath}\t{phenotype_ids}')
+            f"[Insert]\tPhenotype IDs for {phenotype_filepath}\t{phenotype_ids}"
+        )
 
     # Genotype
-    line_filename = conf['lines_filename']
+    line_filename = conf["lines_filename"]
     for c in range(1, chromosome_count + 1):
-        chromosome_shortname = 'chr' + str(c)
+        chromosome_shortname = "chr" + str(c)
         chromosome_id = find.find_chromosome(
-            conn, args, chromosome_shortname, species_id)
+            conn, args, chromosome_shortname, species_id
+        )
         geno_filename = genotype_filename.substitute(
-            dict(chr=chromosome_shortname, cwd=f'{args.cwd}', shortname=species_shortname))
+            dict(
+                chr=chromosome_shortname, cwd=f"{args.cwd}", shortname=species_shortname
+            )
+        )
 
         if not os.path.isfile(geno_filename):
-            logging.warning(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), geno_filename)) 
+            logging.warning(
+                FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), geno_filename
+                )
+            )
             continue
         if not os.path.isfile(line_filename):
-            logging.error(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), line_filename))
-        genotype_ids = insert.insert_genotypes_from_file(conn=conn,
-                                                         args=args,
-                                                         genotypeFile=geno_filename,
-                                                         lineFile=line_filename,
-                                                         chromosomeID=chromosome_id,
-                                                         populationID=population_id,
-                                                         genotype_versionID=genotype_version_id
-                                                         )
-        conf['genotype_ids'] = genotype_ids
+            logging.error(
+                FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), line_filename
+                )
+            )
+        genotype_ids = insert.insert_genotypes_from_file(
+            conn=conn,
+            args=args,
+            genotypeFile=geno_filename,
+            lineFile=line_filename,
+            chromosomeID=chromosome_id,
+            populationID=population_id,
+            genotype_versionID=genotype_version_id,
+        )
+        conf["genotype_ids"] = genotype_ids
 
     # Variants
     for c in range(1, chromosome_count + 1):
-        chromosome_shortname = 'chr' + str(c)
+        chromosome_shortname = "chr" + str(c)
         chromosome_id = find.find_chromosome(
-            conn, args, chromosome_shortname, species_id)
+            conn, args, chromosome_shortname, species_id
+        )
         variant_filename = variants_filename.substitute(
-            dict(chr=chromosome_shortname, cwd=f'{args.cwd}', shortname=species_shortname))
+            dict(
+                chr=chromosome_shortname, cwd=f"{args.cwd}", shortname=species_shortname
+            )
+        )
         if not os.path.isfile(variant_filename):
-            logging.warning(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), variant_filename))
+            logging.warning(
+                FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), variant_filename
+                )
+            )
             continue
         # insert.insert_variants_from_file(conn,
         #                                  args,
@@ -221,8 +274,6 @@ def collect(args):
         #                                  chromosome_id)
 
         # NOTE(tparker): Changed variant insertion to the async version
-        insert.insert_variants_from_file_async(conn,
-                                               args,
-                                               variant_filename,
-                                               species_id,
-                                               chromosome_id)
+        insert.insert_variants_from_file_async(
+            conn, args, variant_filename, species_id, chromosome_id
+        )
