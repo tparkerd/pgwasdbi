@@ -17,7 +17,7 @@ with open("requirements.txt") as requirements_file:
 test_requirements = [ ]
 
 setup(
-    author="Timothy Dennis Parker",
+    author="Tim Parker",
     author_email='tparker@danforthcenter.org',
     python_requires='>=3.6',
     classifiers=[
