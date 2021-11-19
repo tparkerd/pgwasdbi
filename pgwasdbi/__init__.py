@@ -1,5 +1,5 @@
-"""Top-level package for pgwasdbi."""
+"""Top-level package for Plant GWAS database Ingest Package."""
 
-__author__ = """Tim Parker"""
-__email__ = "Tim.ParkerD@gmail.com"
-__version__ = "0.2.0"
+__author__ = """Timothy Dennis Parker"""
+__email__ = 'tparker@danforthcenter.org'
+__version__ = '0.1.0'

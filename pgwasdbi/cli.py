@@ -63,7 +63,6 @@ def main():
     # parser.add_argument("--reset-qa", dest="reset_qa", action="store_true", help="Empty the QA database")
 
     args = parser.parse_args()
-
     args.module_name = "main"
     log.configure(args)
 
@@ -102,7 +101,6 @@ def main():
         args.validate = [v for v in args.validate if v in validation_options]
 
     pgwasdbi.main(args)
-
 
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover

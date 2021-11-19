@@ -1,12 +1,22 @@
-# pgwasdbi
+# Plant GWAS database Ingest Package
 
 Data importation modules for Baxter lab's GWAS database
 
 ## Features
 
+* TODO
+
+## Planned Features
+
+* Database connection test without data
+* Allow global configuration to be set by user using syntax similar to `pgwasdbi config --global hostname=192.168.0.232`.
+
 ## Installation
 
-### Environment Make a .env file in your root directory. You may use the .env.example as a basis for it.
+### Environment
+
+Make a `.env` file in your root directory. You may use the `.env.example` as a basis for it.
+
 
 ```ini
 # .env.example
@@ -17,9 +27,13 @@ host=localhost
 port=5432
 ```
 
-## Usage Importing data into the GWAS database is split into four phases: initialization, gather, collection, and then results.
+## Usage
 
-`python import.py --verbose -f data/maize.json data/maize282`
+Importing data into the GWAS database is split into four phases: initialization, gather, collection, and then results.
+
+```bash
+python import.py --verbose -f data/maize.json data/maize282
+```
 
 The input configuration file (.json) is used to locate the data files. Below is an example data configuration file.
 
@@ -59,7 +73,7 @@ The input configuration file (.json) is used to locate the data files. Below is 
 
 #### 1. Phenotype File
 
-This file contains all measures and measurements for each pedigree. It is the source for the tables: phenotype
+This file contains all measures and measurements for each pedigree. It is the source for the tables: `phenotype`
 
 #### 2. Kinship File
 
@@ -75,9 +89,10 @@ This contains the results of the GWAS analysis. It will include the SNP, p-value
 
 #### 5. Genotype Files
 
-These files are sometimes collapsed into three single files, but they must be separated by chromosome, using the naming convension: chr\<NUMBER\>\_species.\<EXTENSION\>
 
-For example: chr4_maize.012, chr4_maize.012.pos, chr4_maize.012.indv.
+These files are sometimes collapsed into three single files, but they must be separated by chromosome, using the naming convension: `chr<NUMBER>_species.<EXTENSION>`
+
+For example: `chr4_maize.012`, `chr4_maize.012.pos`, `chr4_maize.012.indv`.
 
 ## Running Tests
 

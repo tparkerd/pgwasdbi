@@ -7,22 +7,21 @@ from setuptools import setup, find_packages
 with open('README.md') as readme_file:
     readme = readme_file.read()
 
-with open('HISTORY.md') as history_file:
+with open('CHANGELOG.md') as history_file:
     history = history_file.read()
 
-requirements = [ 'pandas', 'psycopg2-binary', 'configparser', 'tqdm', 'python-dotenv', 'pandas_schema', 'asyncpg' ]
-
-setup_requirements = [ ]
+requirements = [ ]
+with open("requirements.txt") as requirements_file:
+    requirements = requirements_file.readlines()
 
 test_requirements = [ ]
 
 setup(
     author="Tim Parker",
-    author_email='Tim.ParkerD@gmail.com',
-    python_requires='>=3.5',
+    author_email='tparker@danforthcenter.org',
+    python_requires='>=3.6',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.8',
@@ -39,10 +38,9 @@ setup(
     keywords='pgwasdbi',
     name='pgwasdbi',
     packages=find_packages(include=['pgwasdbi', 'pgwasdbi.*']),
-    setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/tparkerd/pgwasdbi',
-    version='0.2.0',
+    version='0.1.0',
     zip_safe=False,
 )
