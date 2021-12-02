@@ -19,12 +19,12 @@ test_requirements = [ ]
 setup(
     author="Tim Parker",
     author_email='tparker@danforthcenter.org',
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
     description="Data importation modules for Baxter lab's GWAS database",
     entry_points={
