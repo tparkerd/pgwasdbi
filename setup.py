@@ -19,7 +19,7 @@ test_requirements = [ ]
 setup(
     author="Tim Parker",
     author_email='tparker@danforthcenter.org',
-    python_requires='>=3.6',
+    python_requires='>=3.8',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Natural Language :: English',
@@ -29,7 +29,7 @@ setup(
     description="Data importation modules for Baxter lab's GWAS database",
     entry_points={
         'console_scripts': [
-            'pgwasdbi=pgwasdbi.cli:main',
+            'pgwasdbi=pgwasdbi.cli:safe_main',
         ],
     },
     install_requires=requirements,

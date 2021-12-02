@@ -14,8 +14,6 @@ def configure(module_name, *args, **kwargs):
     if "verbose" in kwargs and kwargs["verbose"]:
         logging_level = logging.DEBUG
 
-    __version__ = version('pgwasdbi')
-
     logFormatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s %(lineno)d - %(message)s')
     rootLogger = logging.getLogger()
     rootLogger.setLevel(logging_level)
