@@ -29,7 +29,7 @@ setup(
     description="Data importation modules for Baxter lab's GWAS database",
     entry_points={
         'console_scripts': [
-            'pgwasdbi=pgwasdbi.cli:safe_main',
+            'pgwasdbi=pgwasdbi.cli:main',
         ],
     },
     install_requires=requirements,
