@@ -74,7 +74,6 @@ def parse_options():
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity")
     parser.add_argument("-V", "--version", action="version", version=f'%(prog)s {__version__}')
-    
     parser.add_argument(
             "-n",
             "--dry-run",
@@ -84,19 +83,19 @@ def parse_options():
             help="(Dry Run) Preview output via stdout. Will prevent any files from being written.",
         )
     parser.add_argument(
-        "--validate",
-        action="store",
-        nargs="+",
-        metavar="DATA_FORMAT",
-        help="Validate input files. Available options: ['all', 'standard', 'config', 'line', 'genotype', 'variant', 'kinship', 'population', 'phenotype', 'runs', 'result']",
-    )
+            "--validate",
+            action="store",
+            nargs="+",
+            metavar="DATA_FORMAT",
+            help="Validate input files. Available options: ['all', 'standard', 'config', 'line', 'genotype', 'variant', 'kinship', 'population', 'phenotype', 'runs', 'result']",
+        )
     parser.add_argument(
-        "path",
-        metavar="PATH",
-        type=argparse.FileType("r"),
-        nargs=1,
-        help="JSON Configuration file",
-    )
+            "path",
+            metavar="PATH",
+            type=argparse.FileType("r"),
+            nargs=1,
+            help="JSON Configuration file",
+        )
 
         # parser.add_argument("--skip-genotype-validation", action="store_true", default=False, help="Errors in .012 files are infrequent, so enable this option to assume valid input.")
         # parser.add_argument("--reset-qa", dest="reset_qa", action="store_true", help="Empty the QA database")
@@ -189,6 +188,10 @@ def main():
             opts = parse_configuration_options()
         elif sys.argv[1] == "test-connection":
             opts = test_connection()
+        # TODO(tparker):
+        # pgwasdbi prepare /path/to/input/folder/
+        # This would be used to "best guess" the JSON format for a new project configuration JSON
+        
         # Normal run
         else:
             opts = parse_options()
