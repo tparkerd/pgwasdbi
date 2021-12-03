@@ -6,42 +6,8 @@ import psycopg2
 from dotenv import load_dotenv
 import logging
 
-
-# Use the parameters in database.ini to configure the database connection
-def config(args):
-  """Collect credentials for connecting to database using environment variables 
-
-    This function parsers out the PostgreSQL credentials from environment
-
-    :return: database connection credentials
-    :rtype: dict
-    :raises: :exc:`FileNotFound`
-
-    :example .env:
-      .. code-block:: env
-        database=database_name
-        user=database_owner
-        password=password
-        host=localhost
-        port=5432
-  """
-  try:
-    load_dotenv(args.env.name)
-  except:
-    raise 
-  # get section, default to postgresql
-  db = {}
-  required_sections = [ 'database', 'user', 'password', 'host', 'port' ]
-  for section in required_sections:
-    try:
-      db[section] = os.getenv(section)
-    except:
-      raise Exception(f"Section '{section}' not found. Please define it as an environment variable.")
-
-  return db
-
 # Return a connection to the database
-def connect(args):
+def connect(*args, **kwargs):
   """Creates connection object to database 
 
     This function creates a connection object to database
@@ -56,7 +22,7 @@ def connect(args):
   conn = None
   try:
     # read connection parameters
-    params = config(args)
+    params = kwargs
 
     # connect to the PostgreSQL server
     logging.debug('Connecting to the PostgreSQL database.')
@@ -80,3 +46,14 @@ def connect(args):
     raise
   
   return conn
+
+
+def connection_test(hostname="localhost",
+                    password=None,
+                    port=5432,
+                    username=None,
+                    database="pgwasdb",
+                    *args,
+                    **kwargs):
+  connect()
+  pass
