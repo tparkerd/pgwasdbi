@@ -57,7 +57,7 @@ def isEmptyDirectory(fpath):
     return False
 
 class Dataset:
-    
+
     def __init_file_structure(self):
         logging.info(f"Dataset folder does not exist. Initializing file structure.")
         self.readme = "README.txt"
@@ -81,7 +81,7 @@ class Dataset:
         os.makedirs(src_fpath)
         os.makedirs(input_fpath)
         os.makedirs(results_fpath)
-            
+
         # TODO: run wizard for empty dataset folder
 
     def __run_wizard(self):
@@ -317,19 +317,19 @@ class Dataset:
         # Base case: folders exists with data
         else:
             # TODO: Find json file
-            # If the json file exists, 
+            # If the json file exists,
             self.__run_wizard()
-            
+
         # Check that the file already exists
         # TODO: check if the json file already exists
         # JUST CASE it was created while the wizard was running or it was previously generated (manual or otherwise)
-        # 
+        #
 
         # Preview form data
         logging.debug(self.__data)
         pprint((self.__data))
-        
-        
+
+
         write_flag = False
         write_flag = questionary.confirm(message=f"Do you wish to create '{metadata_fpath}'").ask()
 
@@ -337,7 +337,6 @@ class Dataset:
             pass
             # with open(metadata_fpath, 'w') as ofp:
             #     json.dump(self.__data, ofp, indent=4, sort_keys=True)
-        
 
     def __repr__(self):
         return f"Dataset('{self.fpath}')"
