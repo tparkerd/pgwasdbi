@@ -75,6 +75,9 @@ def isEmptyDirectory(fpath):
     return False
 
 class Dataset:
+    
+    def __preload(self):
+        pass
 
     def __init_file_structure(self):
         # Create one and initialize file structure
@@ -379,12 +382,24 @@ class Dataset:
             # If the JSON file already exists for this data set, preload it
             json_files = [ f for f in os.path.join(self.fpath, 'input') if f.endswith(".json") ]
             logging.info(f"{json_files=}")
+            if json_files:
+                self.metadata_fpath = questionary.select(message="Select configuration file", choices=json_files).ask()
             self.__run_wizard()
 
+        # Determine metadata filepath
+        if not self.metadata_fpath:
+            self.metadata_fpath = os.path.join(self.fpath, "input", f"{self.slug}.json")
+            logging.warning(f"Metadata filepath has not been defined. Assigning to {self.metadata_fpath}")
+
         # Check that the file already exists
-        # TODO: check if the json file already exists
-        # JUST CASE it was created while the wizard was running or it was previously generated (manual or otherwise)
-        #
+        write_flag = True
+        if os.path.exists(self.metadata_fpath):
+            style = questionary.Style([("qmark", "fg:orange bold")])
+            write_flag = questionary.confirm(message=f"Warning! The configuration file, '{os.path.basename(self.metadata_fpath)}', already exists. Do you wish to overwrite it? This *cannot* be undone.", default=False, qmark="!", style=style).ask()
+        
+        if write_flag:
+            with open(self.metadata_fpath, 'w') as ofp:
+                json.dump(self.__data, ofp, indent=4)
 
         # Preview form data
         logging.debug(self.__data)
