@@ -82,7 +82,7 @@ class Dataset:
         # 2. Input
         # 3. Src
         # 4. name.json (goes inside of the input folder)
-        logging.info(f"Dataset folder does not exist. Initializing file structure.")
+        logging.info(f"Initializing file structure.")
         self.readme = "README.txt"
 
         # Ask user for name of dataset
@@ -109,7 +109,6 @@ class Dataset:
         os.makedirs(results_fpath)
 
         ## Create readme
-        readme_fpath = os.path.join(self.fpath, self.readme)
         with open(readme_fpath, 'w') as ofp:
             title = f"# {self.alias}"
             template = f"""
@@ -154,16 +153,16 @@ class Dataset:
 
     def __run_wizard(self):
         # Get the dataset alias
-        if not self.alias:
-            self.alias = os.path.basename(self.fpath)
         data_files = []
         for root, _, files in os.walk(self.fpath):
             data_files.extend([ os.path.join(root, f) for f in files ])
         logging.debug(f"{data_files=}")
 
         # If the folder is empty, generate the slug from its name
-        self.slug = re.sub(r"\s+", "-", self.alias).lower()
-        self.slug = questionary.text(message=f"Dataset filename [{self.slug}]:", default=self.slug, validate=isValidFilename).ask()
+        if not self.alias:
+            self.alias = os.path.basename(self.fpath)
+            self.slug = re.sub(r"\s+", "-", self.alias).lower()
+            self.slug = questionary.text(message=f"Dataset filename [{self.slug}]:", default=self.slug, validate=isValidFilename).ask()
 
         # Check to see if the JSON file already exists
         # TODO: check if JSON file already exists
@@ -377,8 +376,9 @@ class Dataset:
 
         # Base case: folders exists with data
         else:
-            # TODO: Find json file
-            # If the json file exists,
+            # If the JSON file already exists for this data set, preload it
+            json_files = [ f for f in os.path.join(self.fpath, 'input') if f.endswith(".json") ]
+            logging.info(f"{json_files=}")
             self.__run_wizard()
 
         # Check that the file already exists
