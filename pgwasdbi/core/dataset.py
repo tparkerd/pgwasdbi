@@ -1,20 +1,18 @@
 """Project module. Generates and modifies project configuration files."""
 
-from genericpath import isdir
 import json
 import logging
 import os
 import re
 import stat
-from collections import defaultdict
-from importlib import metadata
-from pprint import pformat, pprint
 from functools import cmp_to_key
+from importlib import metadata
+from pathlib import Path
+from pprint import pformat, pprint
+from textwrap import dedent
 
 import questionary
 from appdirs import user_config_dir
-from questionary import question
-from questionary.prompts.common import Choice
 
 appname = "pgwasdbi"
 appauthor = metadata.metadata(appname)['Author']
@@ -49,6 +47,26 @@ def isDecimalNumber(x):
     else:
         return True
 
+def isValidFilename(fname):
+    """Determine if a file name contains any illegal characters or is a reserved word."""
+    if len(fname) < 1:
+        return "Field is required."
+
+    illegal_characters = ["/", "\\", "<", ">", ":", "\"", "|", "?", ";", "*"]
+    reserved_filenames_windows = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2",
+                                  "COM3", "COM4", "COM5", "COM6", "COM7", "COM8"
+                                  "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5",
+                                  "LPT6", "LPT7", "LPT8", "LPT9"]
+
+    if fname in reserved_filenames_windows:
+        return "Provided name is a reserved word in Windows and use is prohibited."
+
+    for chr in illegal_characters:
+        if chr in fname:
+            return f"'{chr}' is an illegal character."
+
+    return True
+
 def isEmptyDirectory(fpath):
     # If it exists and is a directory...
     if os.path.exists(fpath) and os.path.isdir(fpath):
@@ -59,43 +77,93 @@ def isEmptyDirectory(fpath):
 class Dataset:
 
     def __init_file_structure(self):
+        # Create one and initialize file structure
+        # 1. README
+        # 2. Input
+        # 3. Src
+        # 4. name.json (goes inside of the input folder)
         logging.info(f"Dataset folder does not exist. Initializing file structure.")
         self.readme = "README.txt"
 
         # Ask user for name of dataset
         self.alias = os.path.basename(self.fpath)
-        self.alias = questionary.text(message=f"Dataset Alias [{self.alias}]", default=self.alias, validate=lambda x: "Filename is required." if len(x) < 1 else True).ask()
+        self.alias = questionary.text(message=f"Dataset Alias [{self.alias}]:", default=self.alias, validate=isValidFilename).ask()
 
         # Ask for slug name of dataset
-        self.slug = re.sub(r"\s+", "-", self.alias)
+        self.slug = re.sub(r"\s+", "-", self.alias).lower()
         # self.slug = input(f"Slug name: [{self.slug}]: ") or self.slug
-        self.slug = questionary.text(message=f"Slug name: [{self.slug}]: ", default=self.slug).ask()
+        self.slug = questionary.text(message=f"Dataset filename: [{self.slug}]:", default=self.slug, validate=isValidFilename).ask()
 
         # Create files
+        self.dname = os.path.dirname(self.fpath)
+        self.fpath = os.path.join(self.dname, self.alias)
         src_fpath = os.path.join(self.fpath, "src")
         results_fpath = os.path.join(self.fpath, "results")
         readme_fpath = os.path.join(self.fpath, "README.txt")
         input_fpath = os.path.join(self.fpath, "input")
         self.metadata_fpath = os.path.join(input_fpath, f"{self.slug}.json")
 
+        ## Create folder structure
         os.makedirs(src_fpath)
         os.makedirs(input_fpath)
         os.makedirs(results_fpath)
 
-        # TODO: run wizard for empty dataset folder
+        ## Create readme
+        readme_fpath = os.path.join(self.fpath, self.readme)
+        with open(readme_fpath, 'w') as ofp:
+            title = f"# {self.alias}"
+            template = f"""
+            
+            Enter a description of your data set here. Provide any project-specific information needed to
+            understand it: context and information relevant to interpreting results.
+            
+            ## File Structure & Inventory
+            
+            .
+            ├── input
+            │   └── {os.path.basename(self.metadata_fpath)}
+            ├── README.txt
+            └── src
+            
+            2 directories, 2 files
+            
+            ./input
+                This folder contains all the pre-processed files that are consumed by pgwasdbi
+                to transform and import the data into a database,
+                
+                This includes:
+                    genotypic data (.012)
+                    lines (.012.indv)
+                    SNP positions (.012.pos)
+                    GWAS results (.csv)
+                    Measurements/phenotypes (.csv)
+                    Kinship matrix (.csv)
+                    Population structure matrix (.csv)
+                
+            ./README.txt (this file)
+                Documentation for files associated with the {self.alias} data set
+                
+            ./src
+                This folder contains copies of the original files used to create the input
+                files for GWAS database. These are typically the output files from the associated
+                GWAS pipeline.
+            
+            """
+            ofp.write(title)
+            ofp.write(dedent(template))
 
     def __run_wizard(self):
         # Get the dataset alias
-        self.alias = os.path.basename(self.fpath)
-        logging.info(f"Dataset folder contains data. Collecting metadata.")
+        if not self.alias:
+            self.alias = os.path.basename(self.fpath)
         data_files = []
         for root, _, files in os.walk(self.fpath):
             data_files.extend([ os.path.join(root, f) for f in files ])
         logging.debug(f"{data_files=}")
 
         # If the folder is empty, generate the slug from its name
-        self.slug = re.sub(r"\s+", "-", self.alias)
-        self.slug = questionary.text(message=f"Dataset filename [{self.slug}]:", default=self.slug, validate=lambda text: True if len(text) > 0 else "Filename is required.").ask()
+        self.slug = re.sub(r"\s+", "-", self.alias).lower()
+        self.slug = questionary.text(message=f"Dataset filename [{self.slug}]:", default=self.slug, validate=isValidFilename).ask()
 
         # Check to see if the JSON file already exists
         # TODO: check if JSON file already exists
@@ -120,7 +188,7 @@ class Dataset:
 
         # Species binomial name
         binomial_name = ""
-        match self.__data["species_shortname"]:
+        match self.__data["species_shortname"].lower():
             case "maize":
                 binomial_name = "Zea mays"
             case "setaria":
@@ -269,17 +337,15 @@ class Dataset:
         if phenotype_files:
             self.__data["phenotype_filename"] = phenotype_files
 
-    def __init__(self, fpath = None):
-
+    def __init__(self, fpath = None, *args, **kwargs):
+        # Establish default values
         self.permissions = stat.S_IRUSR | stat.S_IWUSR
         self.fpath = os.path.realpath(fpath)  # realpath to data folder
         self.readme = None  #  documentation
         self.alias = None  #  short-hand name of data set
         self.slug = None  #  filename friendly name for dataset (e.g., WiDiv or wisconsin-diversity-panel)
         self.metadata_fpath = None  # filename for dataset configuration file (e.g., WiDiv.json)
-
         self.__data = dict()
-        # Establish default values
         self.__data["species_shortname"] = ""
         self.__data["species_binomial_name"] = ""
         self.__data["species_subspecies"] = ""
@@ -305,13 +371,8 @@ class Dataset:
         self.__data["owner"] = ""
 
         # Base case: No dataset folder exists or empty folder
-        # Create one and initialize file structure
-        # 1. README
-        # 2. Input
-        # 3. Src
-        # 4. name.json (goes inside of the input folder)
         if not os.path.exists(self.fpath) or isEmptyDirectory(self.fpath):
-            self.__init_files_structure()
+            self.__init_file_structure()
             self.__run_wizard()
 
         # Base case: folders exists with data
@@ -330,13 +391,7 @@ class Dataset:
         pprint((self.__data))
 
 
-        write_flag = False
-        write_flag = questionary.confirm(message=f"Do you wish to create '{metadata_fpath}'").ask()
 
-        if write_flag:
-            pass
-            # with open(metadata_fpath, 'w') as ofp:
-            #     json.dump(self.__data, ofp, indent=4, sort_keys=True)
 
     def __repr__(self):
         return f"Dataset('{self.fpath}')"
