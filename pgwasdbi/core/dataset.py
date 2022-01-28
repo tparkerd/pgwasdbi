@@ -77,8 +77,23 @@ def isEmptyDirectory(fpath):
 class Dataset:
     
     def __preload(self):
-        pass
-
+        """Load existing metadata from JSON file for dataset (e.g., my-dataset.json)"""
+        # Base case: file does not exist, therefore cannot load
+        if self.metadata_fpath is not None and not os.path.exists(self.metadata_fpath):
+            logging.info(f"Project metadata file does not exists: '{self.metadata_fpath=}'")
+            return
+        
+        logging.info(f"Loading project metadata from: '{self.metadata_fpath}'")
+        with open(self.metadata_fpath, 'r') as ifp:
+            metadata = json.load(ifp)
+        logging.debug(pformat(metadata))
+            
+        # For each key-value pair in the metadata object, copy the value to its
+        # corresponding key in the object's instance internal data
+        for key, value in metadata.items():
+            logging.debug(f"Loading '{key}': '{value}'")
+            self.__data[key] = value
+        
     def __init_file_structure(self):
         # Create one and initialize file structure
         # 1. README
@@ -164,12 +179,19 @@ class Dataset:
         # If the folder is empty, generate the slug from its name
         if not self.alias:
             self.alias = os.path.basename(self.fpath)
-            self.slug = re.sub(r"\s+", "-", self.alias).lower()
+            if self.metadata_fpath is not None:
+                self.slug = os.path.splitext(os.path.basename(self.metadata_fpath))[0]
+            else:
+                self.slug = re.sub(r"\s+", "-", self.alias).lower()
             self.slug = questionary.text(message=f"Dataset filename [{self.slug}]:", default=self.slug, validate=isValidFilename).ask()
 
+            # Update metadata file if changed
+            if self.metadata_fpath is not None:
+                self.metadata_fpath = os.path.join(os.path.dirname(self.metadata_fpath), f"{self.slug}.json")
+
         # Check to see if the JSON file already exists
-        # TODO: check if JSON file already exists
-        # DO I WANT TO ABORT OR PRELOAD THE INFO FROM IT???
+        # If it does, load the values as defaults
+        self.__preload()
 
         # Find chromosome files (e.g., .012) files
         # Use the number of files
@@ -179,8 +201,9 @@ class Dataset:
         logging.debug(pformat(genotype_files))
 
         # Species shortname (extracted from .012 files)
-        shortname = ""
-        if genotype_files:
+        shortname = self.__data["species_shortname"] if self.__data["species_shortname"] else ""
+        logging.info(f"Preloaded value for {shortname=}")
+        if not shortname and genotype_files:
             shortname_pattern = r"chr(?P<id>\d+)_+(?P<shortname>[^\.]+)\.012"
             match = re.match(shortname_pattern, os.path.basename(genotype_files[0]))
             logging.debug(f"Guessed species shortname: {match=}")
@@ -189,7 +212,7 @@ class Dataset:
         self.__data["species_shortname"] = questionary.text(message="Species shortname:", default=shortname).ask()
 
         # Species binomial name
-        binomial_name = ""
+        binomial_name = self.__data["species_binomial_name"]
         match self.__data["species_shortname"].lower():
             case "maize":
                 binomial_name = "Zea mays"
@@ -202,51 +225,46 @@ class Dataset:
         self.__data["species_binomial_name"] = questionary.text(message="Species binomial name:", default=binomial_name).ask()
 
         # Species subspecies
-        subspecies_name = ""
-        self.__data["species_subspecies"] = questionary.text(message="Species subspecies name:", default=subspecies_name).ask()
+        self.__data["species_subspecies"] = questionary.text(message="Species subspecies name:", default=self.__data["species_subspecies"]).ask()
 
         # Species variety
-        variety = ""
-        self.__data["species_variety"] = questionary.text(message="Species variety name:", default=variety).ask()
+        self.__data["species_variety"] = questionary.text(message="Species variety name:", default=self.__data["species_variety"]).ask()
 
         # Chromosome count
-        self.__data["number_of_chromosomes"] = questionary.text(message="Number of chromosomes:", default=str(len(genotype_files)), validate=isNaturalNumber).ask()
+        chromosome_count = self.__data["number_of_chromosomes"] if "number_of_chromosomes" in self.__data and self.__data["number_of_chromosomes"] else len(genotype_files)
+        self.__data["number_of_chromosomes"] = questionary.text(message="Number of chromosomes:", default=str(chromosome_count), validate=isNaturalNumber).ask()
         if self.__data["number_of_chromosomes"]:
             self.__data["number_of_chromosomes"] = int(self.__data["number_of_chromosomes"])
 
         # Population name
-        population_name = ""
-        self.__data["population_name"] = questionary.text(message="Population name:", default=population_name).ask()
+        self.__data["population_name"] = questionary.text(message="Population name:", default=self.__data["population_name"]).ask()
 
         # Genotype version assembly name
-        genotype_version_assembly_name = ""
-        self.__data["genotype_version_assembly_name"] = questionary.text(message="Genotype version assembly name:", default=genotype_version_assembly_name).ask()
+        self.__data["genotype_version_assembly_name"] = questionary.text(message="Genotype version assembly name:", default=self.__data["genotype_version_assembly_name"]).ask()
 
         # Genotype version annotation name
-        genotype_version_annotation_name = ""
-        self.__data["genotype_version_annotation_name"] = questionary.text(message="Genotype version annotation name:", default=genotype_version_annotation_name).ask()
+        self.__data["genotype_version_annotation_name"] = questionary.text(message="Genotype version annotation name:", default=self.__data["genotype_version_annotation_name"]).ask()
 
-        reference_genome_line_name = ""
-        self.__data["reference_genome_line_name"] = questionary.text(message="Reference genome line name:", default=reference_genome_line_name).ask()
+        # Reference line name
+        self.__data["reference_genome_line_name"] = questionary.text(message="Reference genome line name:", default=self.__data["reference_genome_line_name"]).ask()
 
-        gwas_algorithm_name = ""
-        self.__data["gwas_algorithm_name"] = questionary.text(message="GWAS algorithm name:", default=gwas_algorithm_name).ask()
+        # GWAS algorithm name
+        self.__data["gwas_algorithm_name"] = questionary.text(message="GWAS algorithm name:", default=self.__data["gwas_algorithm_name"]).ask()
 
-        imputation_method_name = ""
-        self.__data["imputation_method_name"] = questionary.text(message="Imputation method name:", default=imputation_method_name).ask()
+        # Imputation method name
+        self.__data["imputation_method_name"] = questionary.text(message="Imputation method name:", default=self.__data["imputation_method_name"]).ask()
 
         # Kinship Matrix
         # NOTE(tparker): there's a non-zero chance that there's more than one kinship matrix, so account for that
-        kinship_filename = [""]
-        kinship_files = [ f for f in data_files if "kinship" in f ]
-        logging.debug(f"Guessed kinship files: {kinship_files=}")
+        kinship_filename = self.__data["kinship_filename"] if "kinship_filename" in self.__data and self.__data["kinship_filename"] is not None else ""
+        kinship_files = [ os.path.basename(f) for f in data_files if "kinship" in f ]
+        logging.debug(f"Candidate kinship matrix file(s): {kinship_files=}")
         if kinship_files:
             if len(kinship_files) > 1:
-                kinship_filename = questionary.select(message="Select kinship matrix file:", choices=kinship_files).ask()
+                kinship_filename = questionary.select(message="Select kinship matrix file:", choices=kinship_files, default=kinship_filename).ask()
             else:
                 kinship_filename = kinship_files[0]
-        else:
-            kinship_filename = kinship_filename[0]  # no kinship matrix was provided
+        
         kinship_filename = os.path.basename(kinship_filename)  # make sure to use basename
         logging.debug(f"{kinship_filename=}")
         self.__data["kinship_filename"] = kinship_filename
@@ -257,7 +275,7 @@ class Dataset:
             kinship_algortihm_name = "Astle-Balding"
         elif "raden" in kinship_filename.lower() and "van" in kinship_algortihm_name.lower():
             kinship_algortihm_name = "VanRaden"
-        self.__data["kinship_algortihm_name"] = questionary.text(message="Kinship algorithm name:", default=kinship_algortihm_name).ask()
+        self.__data["kinship_algortihm_name"] = questionary.text(message="Kinship algorithm name:", default=self.__data["kinship_algortihm_name"]).ask()
 
         # Population Structure
         population_structure_filename = [""]
@@ -380,7 +398,11 @@ class Dataset:
         # Base case: folders exists with data
         else:
             # If the JSON file already exists for this data set, preload it
-            json_files = [ f for f in os.path.join(self.fpath, 'input') if f.endswith(".json") ]
+            json_files = []
+            for root, _, files in os.walk(os.path.join(self.fpath, "input")):
+                for f in files:
+                    if f.endswith('.json'):
+                        json_files.append(os.path.join(root, f))
             logging.info(f"{json_files=}")
             if json_files:
                 self.metadata_fpath = questionary.select(message="Select configuration file", choices=json_files).ask()
@@ -389,7 +411,7 @@ class Dataset:
         # Determine metadata filepath
         if not self.metadata_fpath:
             self.metadata_fpath = os.path.join(self.fpath, "input", f"{self.slug}.json")
-            logging.warning(f"Metadata filepath has not been defined. Assigning to {self.metadata_fpath}")
+            logging.info(f"Metadata filepath has not been defined. Assigning to {self.metadata_fpath}")
 
         # Check that the file already exists
         write_flag = True
